@@ -2,6 +2,32 @@ const cheerio = require("cheerio");
 const colorContrast = require("color-contrast");
 const getSuggestedFixes = require("./openai");
 
+const accessibilityRules = {
+    missing_alt: {
+        message: "Images must have descriptive alt attributes.",
+        fix: "Add an alt attribute to the <img> tag. Example: <img src='image.jpg' alt='Description of the image'>",
+    },
+    skipped_heading: {
+        message: "Headings must be in a logical order (e.g., h1 → h2 → h3).",
+        fix: "Ensure headings follow a sequential order. Example: Use <h1> for the main title, <h2> for subheadings, and so on.",
+    },
+    empty_link: {
+        message: "Links must have meaningful text or an aria-label.",
+        fix: "Add descriptive text inside the <a> tag or use an aria-label. Example: <a href='/about'>About Us</a>",
+    },
+    low_contrast: {
+        message: "Text must have sufficient contrast against its background.",
+        fix: "Use a color contrast checker to ensure a minimum contrast ratio of 4.5:1 for normal text.",
+    },
+    missing_form_label: {
+        message: "Form inputs must have associated labels.",
+        fix: "Add a <label> element for each form input. Example: <label for='name'>Name:</label><input id='name' type='text'>",
+    },
+    missing_aria_role: {
+        message: "Interactive elements must have appropriate ARIA roles.",
+        fix: "Add a role attribute to interactive elements. Example: <div role='button' onclick='handleClick()'>Click me</div>",
+    },
+};
 /**
  * Analyze the accessibility of an HTML document.
  *
@@ -16,116 +42,66 @@ const getSuggestedFixes = require("./openai");
  * @param {string} htmlContent - The HTML content to analyze.
  * @returns {Object} - Accessibility compliance score and detected issues.
  */
-const analyzeAccessibility = async (htmlContent) => {
-  const $ = cheerio.load(htmlContent);
-  let issues = [];
-  let totalChecks = 0;
-  let failedChecks = 0;
-  let lastHeadingLevel = 0;
+const analyzeAccessibility = async (htmlContent, useAI = false) => {
+    const $ = cheerio.load(htmlContent);
+    let issues = [];
+    let totalChecks = 0;
+    let failedChecks = 0;
+    let lastHeadingLevel = 0;
 
-  // Asynchronously check for missing alt attributes on images
-  const imgIssues = $("img").map(async (_, img) => {
-    totalChecks++;
-    if (!$(img).attr("alt")) {
-      failedChecks++;
-      const suggestedFix = await getSuggestedFixes("Missing alt attribute on image");
-      issues.push({
-        issue: "Missing alt attribute on image",
-        element: $.html(img),
-        suggestedFix,
-      });
-    }
-  }).get();
+    const addIssue = async (type, element) => {
+        failedChecks++;
+        const suggestedFix = useAI ? await getSuggestedFixes(type) : accessibilityRules[type].fix;
+        issues.push({ issue: accessibilityRules[type].message, element: $.html(element), fix: suggestedFix });
+    };
 
-  // Asynchronously check for skipped heading levels
-  const headingIssues = $("h1, h2, h3, h4, h5, h6").map(async (_, heading) => {
-    totalChecks++;
-    const level = parseInt(heading.tagName.charAt(1));
-    if (lastHeadingLevel && level > lastHeadingLevel + 1) {
-      failedChecks++;
-      const suggestedFix = await getSuggestedFixes(`Skipped heading level from h${lastHeadingLevel} to h${level}`);
-      issues.push({
-        issue: `Skipped heading level from h${lastHeadingLevel} to h${level}`,
-        element: $.html(heading),
-        suggestedFix,
-      });
-    }
-    lastHeadingLevel = level;
-  }).get();
+    // Ensure total checks are counted correctly
+    $("img").each((_, img) => {
+        totalChecks++;
+        if (!$(img).attr("alt")) addIssue("missing_alt", img);
+    });
 
-  // Asynchronously check for empty links
-  const linkIssues = $("a").map(async (_, link) => {
-    totalChecks++;
-    if (!$(link).text().trim() && !$(link).attr("aria-label")) {
-      failedChecks++;
-      const suggestedFix = await getSuggestedFixes("Empty link");
-      issues.push({
-        issue: "Empty link",
-        element: $.html(link),
-        suggestedFix,
-      });
-    }
-  }).get();
+    $("h1, h2, h3, h4, h5, h6").each((_, heading) => {
+        totalChecks++;
+        const level = parseInt(heading.tagName.charAt(1));
+        if (lastHeadingLevel && level > lastHeadingLevel + 1) {
+            addIssue("skipped_heading", heading);
+        }
+        lastHeadingLevel = level;
+    });
 
-  // Asynchronously check for missing form labels
-  const formLabelIssues = $('input:not([type="hidden"])').map(async (_, input) => {
-    totalChecks++;
-    if (
-      !$(input).attr("id") ||
-      !$(`label[for="${$(input).attr("id")}"]`).length
-    ) {
-      failedChecks++;
-      const suggestedFix = await getSuggestedFixes("Form input missing associated label");
-      issues.push({
-        issue: "Form input missing associated label",
-        element: $.html(input),
-        suggestedFix,
-      });
-    }
-  }).get();
+    $("a").each((_, link) => {
+        totalChecks++;
+        if (!$(link).text().trim() && !$(link).attr("aria-label")) addIssue("empty_link", link);
+    });
 
-  // Asynchronously check for low contrast text
-  const contrastIssues = $("p, span, div").map(async (_, el) => {
-    totalChecks++;
-    const color = $(el).css("color");
-    const bgColor = $(el).css("background-color") || "white";
-    if (color && bgColor && colorContrast(color, bgColor) < 4.5) {
-      failedChecks++;
-      const suggestedFix = await getSuggestedFixes("Low contrast text");
-      issues.push({
-        issue: "Low contrast text",
-        element: $.html(el),
-        suggestedFix,
-      });
-    }
-  }).get();
+    $('input:not([type="hidden"])').each((_, input) => {
+        totalChecks++;
+        if (!$(input).attr("id") || !$(`label[for='${$(input).attr("id")}]`).length) {
+            addIssue("missing_form_label", input);
+        }
+    });
 
-  // Asynchronously check for missing ARIA roles on interactive elements
-  const ariaIssues = $("div, span").map(async (_, el) => {
-    totalChecks++;
-    if ($(el).attr("onclick") && !$(el).attr("role")) {
-      failedChecks++;
-      const suggestedFix = await getSuggestedFixes("Interactive element missing ARIA role");
-      issues.push({
-        issue: "Interactive element missing ARIA role",
-        element: $.html(el),
-        suggestedFix,
-      });
-    }
-  }).get();
+    $("p, span, div").each((_, el) => {
+        totalChecks++;
+        const color = $(el).css("color");
+        const bgColor = $(el).css("background-color") || "white";
+        if (color && bgColor && colorContrast(color, bgColor) < 4.5) {
+            addIssue("low_contrast", el);
+        }
+    });
 
-  // Wait for all asynchronous tasks to finish
-  await Promise.all([
-    ...imgIssues,
-    ...headingIssues,
-    ...linkIssues,
-    ...formLabelIssues,
-    ...contrastIssues,
-    ...ariaIssues,
-  ]);
+    $("div, span, button").each((_, el) => {
+        totalChecks++;
+        if ($(el).attr("onclick") && !$(el).attr("role")) {
+            addIssue("missing_aria_role", el);
+        }
+    });
 
-  const complianceScore = ((totalChecks - failedChecks) / totalChecks) * 100;
-  return { score: complianceScore.toFixed(2), issues };
+    // Prevent division by zero
+    const complianceScore = totalChecks > 0 ? ((totalChecks - failedChecks) / totalChecks) * 100 : 100;
+
+    return { score: complianceScore.toFixed(2), issues };
 };
 
 module.exports = analyzeAccessibility;
