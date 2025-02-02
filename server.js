@@ -1,10 +1,14 @@
 const express = require('express');
 const multer = require('multer');
 const { JSDOM } = require('jsdom');
+const cors = require('cors');
+const cheerio = require('cheerio');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
+app.use(cors());
 app.use(express.json());
+
 
 /**
  * Analyze the accessibility of an HTML document.
