@@ -17,10 +17,6 @@ This project provides an API for analyzing HTML files to detect accessibility is
 
 - **Backend**: Node.js, Express, Multer, JSDOM, Cheerio, OpenAI
 
-## Repositories
-
-- **Backend Repository**: [GitHub - Backend](https://github.com/thegeektets/savannah-accessibility-backend)
-
 ## Installation
 
 ### Prerequisites
