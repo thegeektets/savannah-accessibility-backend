@@ -12,7 +12,7 @@ This project provides an API for analyzing HTML files to detect accessibility is
 - Verifies interactive elements have ARIA roles
 
 ## Tech Stack
-- **Backend**: Node.js, Express, Multer, JSDOM
+- **Backend**: Node.js, Express, Multer, JSDOM, Cheerio, OpenAI
 
 ## Repositories
 - **Backend Repository**: [GitHub - Backend](https://github.com/thegeektets/savannah-accessibility-backend)
@@ -31,7 +31,14 @@ Ensure you have **Node.js** installed on your machine.
    ```sh
    npm install
    ```
-3. Start the server:
+3. Configure environment variables:
+   - Create a `.env` file in the root directory.
+   - Add the following variables:
+     ```sh
+     OPENAI_API_KEY=your_openai_api_key_here
+     PORT=8888
+     ```
+4. Start the server:
    ```sh
    npm start
    ```
@@ -70,15 +77,58 @@ Ensure you have **Node.js** installed on your machine.
 - **50-79%**: Needs improvement
 - **Below 50%**: Poor accessibility compliance
 
-## Deployment
+## Deployment Instructions
 To deploy the API on a cloud provider, follow these general steps:
-1. Choose a cloud provider (e.g., AWS, Heroku, Vercel)
-2. Set up an environment with Node.js
-3. Deploy the application using a hosting service
+
+### Deploying to AWS (EC2 or Lambda)
+1. **Set up an EC2 instance**:
+   - Install Node.js and Git on the server.
+   - Clone the repository and install dependencies.
+   - Set up environment variables in `.env`.
+   - Start the server using `pm2` for process management.
+2. **Deploy using AWS Lambda**:
+   - Package the app using `serverless` framework.
+   - Deploy using `serverless deploy`.
+
+### Deploying to Heroku
+1. Install the [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli).
+2. Run:
+   ```sh
+   heroku create accessibility-checker-api
+   git push heroku main
+   heroku config:set OPENAI_API_KEY=your_api_key
+   heroku ps:scale web=1
+   ```
+
+### Deploying to Vercel
+1. Install the [Vercel CLI](https://vercel.com/docs/cli).
+2. Run:
+   ```sh
+   vercel
+   ```
+
+## Design Document
+
+### Architecture Overview
+The system follows a **RESTful API** architecture and consists of:
+- **Express.js Server**: Handles API requests and file uploads.
+- **Multer Middleware**: Processes file uploads.
+- **Cheerio & JSDOM**: Parses and analyzes HTML content.
+- **OpenAI API**: Provides suggested fixes for detected accessibility issues.
+
+### Scoring Logic
+The accessibility score is calculated as follows:
+1. **Total checks**: The number of accessibility rules applied to the HTML.
+2. **Failed checks**: The number of detected accessibility issues.
+3. **Compliance Score Formula**:
+   ```
+   complianceScore = ((totalChecks - failedChecks) / totalChecks) * 100;
+   ```
 
 ## Future Improvements
 - Implement more WCAG compliance checks
 - Add logging and monitoring features
+- Support for real-time accessibility analysis via browser extensions
 
 ## License
 This project is open-source and available under the MIT License.
