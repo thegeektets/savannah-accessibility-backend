@@ -1,0 +1,30 @@
+name: Deploy Node.js Server to Google Cloud VM
+
+on:
+  push:
+    branches:
+      - master  
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GC_VM_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.GC_VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VM
+        run: |
+          ssh ${{ secrets.GC_VM_USER }}@${{ secrets.GC_VM_HOST }} << 'EOF'
+            cd ${{ secrets.GC_VM_DIR }} || mkdir -p ${{ secrets.GC_VM_DIR }} && cd ${{ secrets.GC_VM_DIR }}
+            git pull origin main || git clone git@github.com:Thegeektets/savannah-accessibility-backend.git .
+            npm install
+            pm2 restart server || pm2 start server.js --name node-server
+          EOF
