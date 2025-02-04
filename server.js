@@ -38,7 +38,7 @@ app.post("/upload", upload.single("htmlFile"), async (req, res) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 8888;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+const port = process.env.PORT || 8000; 
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${port}`);
 });
