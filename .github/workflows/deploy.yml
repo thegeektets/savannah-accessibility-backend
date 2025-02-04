@@ -25,6 +25,11 @@ jobs:
           ssh ${{ secrets.GC_VM_USER }}@${{ secrets.GC_VM_HOST }} << 'EOF'
             cd ${{ secrets.GC_VM_DIR }} || mkdir -p ${{ secrets.GC_VM_DIR }} && cd ${{ secrets.GC_VM_DIR }}
             git pull origin master || git clone git@github.com:Thegeektets/savannah-accessibility-backend.git .
+            
+            # Create the .env file from GitHub secrets
+            echo "PORT=${{ secrets.PORT }}" > .env
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+
             npm install
             pm2 restart server || pm2 start server.js --name node-server
           EOF
