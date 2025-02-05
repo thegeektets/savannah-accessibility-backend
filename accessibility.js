@@ -1,4 +1,4 @@
-const cheerio = require("cheerio");
+const { JSDOM } = require("jsdom");
 const colorContrast = require("color-contrast");
 const getSuggestedFixes = require("./openai");
 
@@ -43,7 +43,7 @@ const accessibilityRules = {
  * @returns {Object} - Accessibility compliance score and detected issues.
  */
 const analyzeAccessibility = async (htmlContent, useAI = false) => {
-  const $ = cheerio.load(htmlContent);
+  const { document } = new JSDOM(htmlContent).window;
   let issues = [];
   let totalChecks = 0;
   let failedChecks = 0;
@@ -54,18 +54,18 @@ const analyzeAccessibility = async (htmlContent, useAI = false) => {
     const suggestedFix = accessibilityRules[type].fix;
     issues.push({
       issue: accessibilityRules[type].message,
-      element: $.html(element),
+      element: element.outerHTML,
       fix: suggestedFix,
     });
   };
 
   // Ensure total checks are counted correctly
-  $("img").each((_, img) => {
+  document.querySelectorAll("img").forEach((img) => {
     totalChecks++;
-    if (!$(img).attr("alt")) addIssue("missing_alt", img);
+    if (!img.alt) addIssue("missing_alt", img);
   });
 
-  $("h1, h2, h3, h4, h5, h6").each((_, heading) => {
+  document.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((heading) => {
     totalChecks++;
     const level = parseInt(heading.tagName.charAt(1));
     if (lastHeadingLevel && level > lastHeadingLevel + 1) {
@@ -74,34 +74,31 @@ const analyzeAccessibility = async (htmlContent, useAI = false) => {
     lastHeadingLevel = level;
   });
 
-  $("a").each((_, link) => {
+  document.querySelectorAll("a").forEach((link) => {
     totalChecks++;
-    if (!$(link).text().trim() && !$(link).attr("aria-label"))
+    if (!link.textContent.trim() && !link.getAttribute("aria-label"))
       addIssue("empty_link", link);
   });
 
-  $('input:not([type="hidden"])').each((_, input) => {
+  document.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
     totalChecks++;
-    if (
-      !$(input).attr("id") ||
-      !$(`label[for='${$(input).attr("id")}]`).length
-    ) {
+    if (!input.id || !document.querySelector(`label[for='${input.id}']`)) {
       addIssue("missing_form_label", input);
     }
   });
 
-  $("p, span, div").each((_, el) => {
+  document.querySelectorAll("p, span, div").forEach((el) => {
     totalChecks++;
-    const color = $(el).css("color");
-    const bgColor = $(el).css("background-color") || "white";
+    const color = window.getComputedStyle(el).color;
+    const bgColor = window.getComputedStyle(el).backgroundColor || "white";
     if (color && bgColor && colorContrast(color, bgColor) < 4.5) {
       addIssue("low_contrast", el);
     }
   });
 
-  $("div, span, button").each((_, el) => {
+  document.querySelectorAll("div, span, button").forEach((el) => {
     totalChecks++;
-    if ($(el).attr("onclick") && !$(el).attr("role")) {
+    if (el.getAttribute("onclick") && !el.getAttribute("role")) {
       addIssue("missing_aria_role", el);
     }
   });
