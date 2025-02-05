@@ -28,6 +28,7 @@ const accessibilityRules = {
     fix: "Add a role attribute to interactive elements. Example: <div role='button' onclick='handleClick()'>Click me</div>",
   },
 };
+
 /**
  * Analyze the accessibility of an HTML document.
  *
@@ -89,8 +90,8 @@ const analyzeAccessibility = async (htmlContent, useAI = false) => {
 
   document.querySelectorAll("p, span, div").forEach((el) => {
     totalChecks++;
-    const color = window.getComputedStyle(el).color;
-    const bgColor = window.getComputedStyle(el).backgroundColor || "white";
+    const color = getComputedStyle(el).color;
+    const bgColor = getComputedStyle(el).backgroundColor || "white";
     if (color && bgColor && colorContrast(color, bgColor) < 4.5) {
       addIssue("low_contrast", el);
     }
