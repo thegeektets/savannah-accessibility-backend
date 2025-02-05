@@ -1,6 +1,6 @@
-const htmlparser2 = require('htmlparser2');
-const colorContrast = require('color-contrast');
-const getSuggestedFixes = require('./openai');
+const htmlparser2 = require("htmlparser2");
+const colorContrast = require("color-contrast");
+const getSuggestedFixes = require("./openai");
 
 const accessibilityRules = {
   missing_alt: {
@@ -56,7 +56,10 @@ const analyzeAccessibility = async (htmlContent, useAI = false) => {
 
   const addIssue = async (type, element) => {
     failedChecks++;
-    const suggestedFix = accessibilityRules[type].fix;
+    // do not enable AI without a valid key
+    const suggestedFix = useAI
+      ? getSuggestedFixes(accessibilityRules[type].message)
+      : accessibilityRules[type].fix;
     issues.push({
       issue: accessibilityRules[type].message,
       element: htmlparser2.DomUtils.getOuterHTML(element),
@@ -66,54 +69,75 @@ const analyzeAccessibility = async (htmlContent, useAI = false) => {
 
   // Traverse the parsed DOM
   const traverseDom = (node) => {
-    if (node.type === 'tag') {
+    if (node.type === "tag") {
       // Check for alt attributes on images
-      if (node.name === 'img') {
+      if (node.name === "img") {
         totalChecks++;
-        if (!node.attribs.alt) addIssue('missing_alt', node);
+        if (!node.attribs.alt) addIssue("missing_alt", node);
       }
 
       // Check for heading order
-      if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(node.name)) {
+      if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(node.name)) {
         totalChecks++;
         const level = parseInt(node.name.charAt(1));
         if (lastHeadingLevel && level > lastHeadingLevel + 1) {
-          addIssue('skipped_heading', node);
+          addIssue("skipped_heading", node);
         }
         lastHeadingLevel = level;
       }
 
       // Check for empty links
-      if (node.name === 'a') {
+      if (node.name === "a") {
         totalChecks++;
-        if (!node.children.some(child => child.type === 'text' && child.data.trim()) && !node.attribs['aria-label']) {
-          addIssue('empty_link', node);
+        if (
+          !node.children.some(
+            (child) => child.type === "text" && child.data.trim()
+          ) &&
+          !node.attribs["aria-label"]
+        ) {
+          addIssue("empty_link", node);
         }
       }
 
       // Check for missing form labels
-      if (node.name === 'input') {
+      if (node.name === "input") {
         totalChecks++;
-        if (!node.attribs.id || !handler.dom.some(el => el.type === 'tag' && el.name === 'label' && el.attribs.for === node.attribs.id)) {
-          addIssue('missing_form_label', node);
+        if (
+          !node.attribs.id ||
+          !handler.dom.some(
+            (el) =>
+              el.type === "tag" &&
+              el.name === "label" &&
+              el.attribs.for === node.attribs.id
+          )
+        ) {
+          addIssue("missing_form_label", node);
         }
       }
 
       // Check for low contrast text
-      if (['p', 'span', 'div'].includes(node.name)) {
+      if (["p", "span", "div"].includes(node.name)) {
         totalChecks++;
-        const color = node.attribs.style && node.attribs.style.includes('color') ? node.attribs.style.match(/color:\s*(#[a-zA-Z0-9]+|[a-zA-Z]+)/i)[1] : null;
-        const bgColor = node.attribs.style && node.attribs.style.includes('background-color') ? node.attribs.style.match(/background-color:\s*(#[a-zA-Z0-9]+|[a-zA-Z]+)/i)[1] : 'white';
+        const color =
+          node.attribs.style && node.attribs.style.includes("color")
+            ? node.attribs.style.match(/color:\s*(#[a-zA-Z0-9]+|[a-zA-Z]+)/i)[1]
+            : null;
+        const bgColor =
+          node.attribs.style && node.attribs.style.includes("background-color")
+            ? node.attribs.style.match(
+                /background-color:\s*(#[a-zA-Z0-9]+|[a-zA-Z]+)/i
+              )[1]
+            : "white";
         if (color && bgColor && colorContrast(color, bgColor) < 4.5) {
-          addIssue('low_contrast', node);
+          addIssue("low_contrast", node);
         }
       }
 
       // Check for missing ARIA role
-      if (['div', 'span', 'button'].includes(node.name)) {
+      if (["div", "span", "button"].includes(node.name)) {
         totalChecks++;
         if (node.attribs.onclick && !node.attribs.role) {
-          addIssue('missing_aria_role', node);
+          addIssue("missing_aria_role", node);
         }
       }
     }

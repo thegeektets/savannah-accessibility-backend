@@ -140,7 +140,7 @@ The system follows a **RESTful API** architecture and consists of:
 
 - **Express.js Server**: Handles API requests and file uploads.
 - **Multer Middleware**: Processes file uploads.
-- **Cheerio & JSDOM**: Parses and analyzes HTML content.
+- **htmlparser2**: Parses and analyzes HTML content.
 - **OpenAI API**: Provides suggested fixes for detected accessibility issues.
 
 ### Scoring Logic
