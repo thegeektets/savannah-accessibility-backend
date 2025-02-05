@@ -1,6 +1,6 @@
-const { JSDOM } = require("jsdom");
-const colorContrast = require("color-contrast");
-const getSuggestedFixes = require("./openai");
+const htmlparser2 = require('htmlparser2');
+const colorContrast = require('color-contrast');
+const getSuggestedFixes = require('./openai');
 
 const accessibilityRules = {
   missing_alt: {
@@ -44,7 +44,11 @@ const accessibilityRules = {
  * @returns {Object} - Accessibility compliance score and detected issues.
  */
 const analyzeAccessibility = async (htmlContent, useAI = false) => {
-  const { document } = new JSDOM(htmlContent).window;
+  const handler = new htmlparser2.DomHandler();
+  const parser = new htmlparser2.Parser(handler);
+  parser.write(htmlContent);
+  parser.end();
+
   let issues = [];
   let totalChecks = 0;
   let failedChecks = 0;
@@ -55,54 +59,73 @@ const analyzeAccessibility = async (htmlContent, useAI = false) => {
     const suggestedFix = accessibilityRules[type].fix;
     issues.push({
       issue: accessibilityRules[type].message,
-      element: element.outerHTML,
+      element: htmlparser2.DomUtils.getOuterHTML(element),
       fix: suggestedFix,
     });
   };
 
-  // Ensure total checks are counted correctly
-  document.querySelectorAll("img").forEach((img) => {
-    totalChecks++;
-    if (!img.alt) addIssue("missing_alt", img);
-  });
+  // Traverse the parsed DOM
+  const traverseDom = (node) => {
+    if (node.type === 'tag') {
+      // Check for alt attributes on images
+      if (node.name === 'img') {
+        totalChecks++;
+        if (!node.attribs.alt) addIssue('missing_alt', node);
+      }
 
-  document.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((heading) => {
-    totalChecks++;
-    const level = parseInt(heading.tagName.charAt(1));
-    if (lastHeadingLevel && level > lastHeadingLevel + 1) {
-      addIssue("skipped_heading", heading);
+      // Check for heading order
+      if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(node.name)) {
+        totalChecks++;
+        const level = parseInt(node.name.charAt(1));
+        if (lastHeadingLevel && level > lastHeadingLevel + 1) {
+          addIssue('skipped_heading', node);
+        }
+        lastHeadingLevel = level;
+      }
+
+      // Check for empty links
+      if (node.name === 'a') {
+        totalChecks++;
+        if (!node.children.some(child => child.type === 'text' && child.data.trim()) && !node.attribs['aria-label']) {
+          addIssue('empty_link', node);
+        }
+      }
+
+      // Check for missing form labels
+      if (node.name === 'input') {
+        totalChecks++;
+        if (!node.attribs.id || !handler.dom.some(el => el.type === 'tag' && el.name === 'label' && el.attribs.for === node.attribs.id)) {
+          addIssue('missing_form_label', node);
+        }
+      }
+
+      // Check for low contrast text
+      if (['p', 'span', 'div'].includes(node.name)) {
+        totalChecks++;
+        const color = node.attribs.style && node.attribs.style.includes('color') ? node.attribs.style.match(/color:\s*(#[a-zA-Z0-9]+|[a-zA-Z]+)/i)[1] : null;
+        const bgColor = node.attribs.style && node.attribs.style.includes('background-color') ? node.attribs.style.match(/background-color:\s*(#[a-zA-Z0-9]+|[a-zA-Z]+)/i)[1] : 'white';
+        if (color && bgColor && colorContrast(color, bgColor) < 4.5) {
+          addIssue('low_contrast', node);
+        }
+      }
+
+      // Check for missing ARIA role
+      if (['div', 'span', 'button'].includes(node.name)) {
+        totalChecks++;
+        if (node.attribs.onclick && !node.attribs.role) {
+          addIssue('missing_aria_role', node);
+        }
+      }
     }
-    lastHeadingLevel = level;
-  });
 
-  document.querySelectorAll("a").forEach((link) => {
-    totalChecks++;
-    if (!link.textContent.trim() && !link.getAttribute("aria-label"))
-      addIssue("empty_link", link);
-  });
-
-  document.querySelectorAll('input:not([type="hidden"])').forEach((input) => {
-    totalChecks++;
-    if (!input.id || !document.querySelector(`label[for='${input.id}']`)) {
-      addIssue("missing_form_label", input);
+    // Recurse through child nodes
+    if (node.children) {
+      node.children.forEach(traverseDom);
     }
-  });
+  };
 
-  document.querySelectorAll("p, span, div").forEach((el) => {
-    totalChecks++;
-    const color = getComputedStyle(el).color;
-    const bgColor = getComputedStyle(el).backgroundColor || "white";
-    if (color && bgColor && colorContrast(color, bgColor) < 4.5) {
-      addIssue("low_contrast", el);
-    }
-  });
-
-  document.querySelectorAll("div, span, button").forEach((el) => {
-    totalChecks++;
-    if (el.getAttribute("onclick") && !el.getAttribute("role")) {
-      addIssue("missing_aria_role", el);
-    }
-  });
+  // Start traversing the DOM
+  handler.dom.forEach(traverseDom);
 
   // Prevent division by zero
   const complianceScore =
