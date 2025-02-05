@@ -2,10 +2,6 @@ require("dotenv").config();
 const { OpenAI } = require("openai");
 
 // Initialize OpenAI with the API key from the environment variable
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 
 /**
  * Get suggested fixes for a given accessibility issue using OpenAI.
@@ -18,6 +14,9 @@ const openai = new OpenAI({
  * @returns {Promise<string>} - The suggested fix for the issue, or a default message if the request fails.
  */
 const getSuggestedFixes = async (issue) => {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
   // Validate input
   if (!issue || typeof issue !== "string") {
     console.error("Invalid issue description provided.");
@@ -48,4 +47,4 @@ const getSuggestedFixes = async (issue) => {
   }
 };
 
-module.exports = { getSuggestedFixes };
+module.exports = getSuggestedFixes;
