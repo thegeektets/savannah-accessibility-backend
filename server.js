@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 // API endpoint for file upload and analysis
-app.post("/upload", upload.single("htmlFile"), async (req, res) => {
+app.post("/api/upload", upload.single("htmlFile"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded." });
   }
@@ -35,6 +35,11 @@ app.post("/upload", upload.single("htmlFile"), async (req, res) => {
     console.error("Error reading or analyzing the file:", err);
     res.status(500).json({ error: "Error processing the file." });
   }
+});
+
+// Test route
+app.get("/api/test", (req, res) => {
+  res.json({ message: "Server is running and API is working!" });
 });
 
 // Start the server
