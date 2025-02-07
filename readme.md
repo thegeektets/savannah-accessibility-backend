@@ -82,8 +82,7 @@ Ensure you have **Node.js** installed on your machine.
     {
       "issue": "Skipped heading level from h2 to h4",
       "element": "<h4>Section Title</h4>",
-       "fix":"Ensure headings follow a sequential order. Example: Use <h1> for the main title, <h2> for subheadings, and so on."
-
+      "fix":"Ensure headings follow a sequential order. Example: Use <h1> for the main title, <h2> for subheadings, and so on."
     }
   ]
 }
@@ -132,6 +131,18 @@ To deploy the API on a cloud provider, follow these general steps:
    vercel
    ```
 
+## Deployed Version
+
+A live test version of the API is available:
+
+**Test URL:** [http://34.46.114.33/api/test](http://34.46.114.33/api/test)
+
+**Response:**
+
+```json
+{"message":"Server is running and API is working!"}
+```
+
 ## Design Document
 
 ### Architecture Overview
@@ -164,3 +175,4 @@ The accessibility score is calculated as follows:
 ## License
 
 This project is open-source and available under the MIT License.
+
